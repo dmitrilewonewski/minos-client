@@ -1,0 +1,22 @@
+#!/bin/bash
+hoff=16
+hon=11
+while [ 1 ]; do
+  browser=`ps -e | grep chromium | wc -l`
+  if [ "$browser" -eq "0" ]; then
+    echo "No browser process found, starting."
+    unclutter -idle 5 &
+    minos-ds
+    sleep 5
+  fi
+  sleep 15
+  xte 'key Tab'
+  dow=`date "+%u"`
+  h=`date "+%H"`
+  m=`date "+%M"`
+  if [ $h -ge $hoff ]; then
+    sleeptime=$(expr 24 - $hoff + $hon)
+    sleeptime=$(expr $sleeptime \* 3600)
+    sudo rtcwake -m mem -s $sleeptime
+  fi
+done
