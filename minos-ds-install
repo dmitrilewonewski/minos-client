@@ -1,0 +1,98 @@
+#!/bin/bash
+# Конфигурирование ИС СПИИРАН
+echo "Конфигурирование ИС СПИИРАН"
+echo "---------------------------"
+
+if [[ $EUID -ne 0 ]]; then
+ echo "Ошибка: Используйте учётную запись root."
+ exit 1
+fi
+
+monitor="1"
+site="http://192.168.0.59/spiiras/"
+key="key"
+user="user"
+install=1
+
+mode=""
+
+while [ "$1" ]; do 
+ case "$1" in
+  "--monitor" | "-m") mode="monitor";;
+  "--key" | "-k") mode="key";;
+  "--site" | "-s") mode="site";;
+  "--user" | "-u") mode="user";;
+  "--no-install") install=0;;
+  *)
+   case "$mode" in
+    "monitor") monitor="$1";;
+    "key") key="$1";;
+    "site") site="$1";;
+    "user") user="$1";;
+    *)
+     echo "Нераспознанный параметр: $1"
+     exit 1
+    ;;
+   esac
+   mode=""
+   ;;
+ esac
+ shift 
+done
+
+date > /tmp/configure-spiiras.log
+if [[ "$install" -eq 1 ]]; then
+ echo "Получение информации о пакетах..."
+ apt-get update > /dev/null
+ echo "Установка пакетов..."
+ apt-get install openssh-server xrdp xautomation unclutter -y
+ echo "Установка Chromium..."
+ apt-get install chromium-browser -y
+fi
+
+# if [ ! -f /bin/spiiras ]; then
+ echo "Создание конфигурации..."
+ touch /usr/bin/minos-ds
+ chmod a+x /usr/bin/minos-ds
+
+ address="${site}view.php?monitor=$monitor&key=$key"
+
+ echo "#!/bin/bash" > /usr/bin/minos-ds
+ echo "chromium-browser --kiosk $address &" >> /usr/bin/minos-ds
+ 
+ if [ ! -f /bin/minos-ds ]; then
+  ln -s /usr/bin/minos-ds /bin/minos-ds
+ fi
+ 
+ if [ ! -f ./minos-ds-starter ]; then
+  wget ${site}files/downloads/minos-ds-starter
+ fi
+ if [ ! -f ./minos-ds-watchdog ]; then
+  wget ${site}files/downloads/minos-ds-watchdog
+ fi
+ cp ./minos-ds-starter /usr/bin/minos-ds-starter
+ cp ./minos-ds-watchdog /usr/bin/minos-ds-watchdog
+ chmod +x /usr/bin/minos-ds-*
+
+ echo "Добавление программы в автозапуск..."
+ if [ -d /home/$user ]; then
+  file="/home/$user/.config/autostart/minos-ds.desktop"
+  echo "[Desktop Entry]" > "$file" 
+  echo "Version=1.0" >> "$file"
+  echo "Name=MINOS-DS" >> "$file"
+  echo "Comment=MINOS Digital Signage Starter" >> "$file"
+  echo "Exec=/usr/bin/minos-ds-starter" >> "$file"
+  echo "Icon=utilities-terminal" >> "$file"
+  echo "Terminal=false" >> "$file"
+  echo "Type=Application" >> "$file"
+  echo "Categories=Application;" >> "$file"
+  chmod a+x "$file"
+ else
+  echo "Директория /home/$user не найдена, автозапуск не настроен."
+ fi
+
+ echo "---------------------------"
+ echo "Используется HTTP-адрес: $address"
+ echo "Для запуска используйте команду: minos-ds-starter"
+# fi
+
